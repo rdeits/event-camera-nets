@@ -1,0 +1,4 @@
+numpy>=1.11
+pandas>=0.19.1
+tables>=3.3
+requests>=2.7
