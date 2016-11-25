@@ -67,10 +67,15 @@ class DavisDataset:
                          format="table",
                          data_columns=True)
             print("Storing events")
-            store.append("events",
-                         events,
-                         format="table",
-                         data_columns=True)
+            start_time = groundtruth.iloc[0].time
+            stop_time = groundtruth.iloc[-1].time
+            events = events[start_time <= events["time"]]
+            events = events[events["time"] <= stop_time]
+            store.append(
+                "events",
+                events,
+                format="table",
+                data_columns=True)
         print("done storing")
         return DavisDataset(store_path)
 
