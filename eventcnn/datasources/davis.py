@@ -3,6 +3,7 @@ import zipfile
 import requests
 import numpy as np
 import pandas as pd
+from .eventblock import EventBlock
 from collections import namedtuple, OrderedDict
 
 
@@ -93,3 +94,41 @@ class DavisDataset:
                                                       name),
                                          os.path.join(data_folder,
                                                       name + ".h5"))
+
+    @property
+    def num_events(self):
+        return self.store.root.events.table.nrows
+
+    @property
+    def num_groundtruth(self):
+        return self.store.root.groundtruth.table.nrows
+
+    def select_events(self, start_index, stop_index):
+        assert start_index >= 0
+        assert stop_index >= start_index
+        assert stop_index < self.num_events
+        return self.store.select("events",
+                                 start=start_index,
+                                 stop=stop_index)
+
+    def event_block(self, start_index, stop_index):
+        events = self.select_events(start_index, stop_index)
+        start_time = events.iloc[0].time
+        end_time = events.iloc[-1].time
+        groundtruth_before = self.store.select(
+            "groundtruth",
+            "time <= start_time").iloc[-1]
+        groundtruth_after = self.store.select(
+            "groundtruth",
+            "time >= end_time").iloc[0]
+        delta_position = np.asarray(
+            groundtruth_after[["px", "py", "pz"]] -
+            groundtruth_before[["px", "py", "pz"]])
+        delta_time = (groundtruth_after.time -
+                      groundtruth_before.time)
+        event_block_delta_position = (
+            delta_position * (end_time - start_time) / delta_time)
+        return EventBlock(events, event_block_delta_position)
+
+
+

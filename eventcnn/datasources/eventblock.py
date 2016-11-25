@@ -37,7 +37,6 @@ class SpatialDiscretization:
 
 
 class EventBlock:
-    def __init__(self, events, delta_position, delta_quaternion):
+    def __init__(self, events, delta_position):
         self.events = events
         self.delta_position = delta_position
-        self.delta_quaternion = delta_quaternion
