@@ -12,6 +12,8 @@ Install required packages:
 
 	pip3 install -r requirements.txt
 
+Install tensorflow from https://www.tensorflow.org/versions/r0.11/get_started/os_setup.html
+
 Activate the eventcnn package for development:
 
 	python3 setup.py develop

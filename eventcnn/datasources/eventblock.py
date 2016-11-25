@@ -3,6 +3,9 @@ import numpy as np
 
 class SpatialDiscretization:
     def __init__(self, lb, ub, steps):
+        lb = np.asarray(lb)
+        ub = np.asarray(ub)
+        steps = np.asarray(steps)
         assert lb.size == ub.size
         assert lb.size == steps.size
         self.lb = lb

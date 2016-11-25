@@ -105,7 +105,7 @@ class DavisDataset:
         return self.store.root.events.table.nrows
 
     @property
-    def num_groundtruth(self):
+    def num_groundtruths(self):
         return self.store.root.groundtruth.table.nrows
 
     def select_events(self, start_index, stop_index):
@@ -116,7 +116,8 @@ class DavisDataset:
                                  start=start_index,
                                  stop=stop_index)
 
-    def event_block(self, start_index, stop_index):
+    def event_block(self, start_index, num_events):
+        stop_index = start_index + num_events
         events = self.select_events(start_index, stop_index)
         start_time = events.iloc[0].time
         end_time = events.iloc[-1].time
