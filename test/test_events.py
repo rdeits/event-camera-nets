@@ -4,6 +4,7 @@ import numpy as np
 from eventcnn.datasources.eventblock import SpatialDiscretization
 from eventcnn.datasources.davis import DavisDataset
 
+
 class TestVectorEncoding(unittest.TestCase):
     def test_round_trip(self):
         for i in range(100):

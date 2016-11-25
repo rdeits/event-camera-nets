@@ -4,6 +4,7 @@ import requests
 import numpy as np
 import pandas as pd
 from .eventblock import EventBlock
+from .config import EventCameraConfig
 from collections import namedtuple, OrderedDict
 
 
@@ -40,6 +41,9 @@ def download_file(url, path):
 class DavisDataset:
     def __init__(self, store_path):
         self.store = pd.HDFStore(store_path)
+        self.camera_config = EventCameraConfig(
+            rows=180,
+            cols=240)
 
     @staticmethod
     def read_csv(input_folder_path, store_path):
@@ -105,7 +109,7 @@ class DavisDataset:
         return self.store.root.events.table.nrows
 
     @property
-    def num_groundtruths(self):
+    def num_groundtruth(self):
         return self.store.root.groundtruth.table.nrows
 
     def select_events(self, start_index, stop_index):
@@ -134,7 +138,9 @@ class DavisDataset:
                       groundtruth_before.time)
         event_block_delta_position = (
             delta_position * (end_time - start_time) / delta_time)
-        return EventBlock(events, event_block_delta_position)
+        return EventBlock(events,
+                          event_block_delta_position,
+                          self.camera_config)
 
 
 
