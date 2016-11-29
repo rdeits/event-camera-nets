@@ -40,12 +40,15 @@ def split_data(testing_fraction,
         "training": 1 - (testing_fraction + validation_fraction)
     }
 
-    chunk_starts = np.arange(0, num_events, chunk_size)
+    chunk_starts = np.arange(0, num_events, chunk_size,
+                             dtype=np.int64).reshape(
+        (-1, 1))
     splits = {}
     for split_type, fraction in split_fractions.items():
         rows_in_chunk = np.arange(0,
                                   fraction * chunk_size - 1,
-                                  events_per_block).reshape(
+                                  events_per_block,
+                                  dtype=np.int64).reshape(
             (1, -1))
         rows = (rows_in_chunk + chunk_starts).reshape((-1))
         splits[split_type] = rows
@@ -64,7 +67,7 @@ class EventSource:
         self.dataset = dataset
         self.events_per_block = events_per_block
         self.augmentation_functions = augmentation_functions
-        self.split = split_data(test_fraction, validation_fraction,
+        self.split = split_data(testing_fraction, validation_fraction,
                                 self.dataset.num_events,
                                 events_per_block=events_per_block)
 
@@ -96,6 +99,10 @@ class EventSource:
     def validation(self):
         for row in self.split.validation:
             yield self.dataset.event_block(row, self.events_per_block)
+
+    def __add__(self, other):
+        assert self.events_per_block == other.events_per_block
+        return EventSourceCombination([self, other])
 
 
 def take_randomly(iterables, lengths):
@@ -141,12 +148,13 @@ class EventSourceCombination:
             return self._training_noshuffle()
 
     def _training_shuffle(self):
-        return take_randomly(self.sources,
-                             [s.num_training for s in self.sources])
+        return take_randomly(
+            [s.training(shuffle=True) for s in self.sources],
+            [s.num_training for s in self.sources])
 
     def _training_noshuffle(self):
         for source in self.sources:
-            yield from source.training()
+            yield from source.training(shuffle=False)
 
     def testing(self):
         for source in self.sources:
