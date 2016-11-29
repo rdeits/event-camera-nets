@@ -116,7 +116,7 @@ class DavisDataset:
     def select_events(self, start_index, stop_index):
         assert start_index >= 0
         assert stop_index >= start_index
-        assert stop_index < self.num_events
+        assert stop_index <= self.num_events
         return self.store.select("events",
                                  start=start_index,
                                  stop=stop_index)

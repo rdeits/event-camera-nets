@@ -40,13 +40,13 @@ def split_data(testing_fraction,
         "training": 1 - (testing_fraction + validation_fraction)
     }
 
-    chunk_starts = np.arange(0, num_events, chunk_size,
+    chunk_starts = np.arange(0, num_events - chunk_size + 1, chunk_size,
                              dtype=np.int64).reshape(
         (-1, 1))
     splits = {}
     for split_type, fraction in split_fractions.items():
         rows_in_chunk = np.arange(0,
-                                  fraction * chunk_size - 1,
+                                  fraction * chunk_size - events_per_block - 1,
                                   events_per_block,
                                   dtype=np.int64).reshape(
             (1, -1))
@@ -88,7 +88,7 @@ class EventSource:
             rows = np.random.permutation(self.split.training)
         else:
             rows = self.split.training
-        for row in self.split.training:
+        for row in rows:
             for fun in self.augmentation_functions:
                 yield fun(self.dataset.event_block(row, self.events_per_block))
 
@@ -130,6 +130,10 @@ class EventSourceCombination:
         self.sources = sources
 
     @property
+    def events_per_block(self):
+        return self.sources[0].events_per_block
+
+    @property
     def num_training(self):
         return sum(source.num_training for source in self.sources)
 
@@ -163,4 +167,8 @@ class EventSourceCombination:
     def validation(self):
         for source in self.sources:
             yield from source.validation
+
+    def __add__(self, other):
+        assert self.events_per_block == other.events_per_block
+        return EventSourceCombination([self, other])
 
