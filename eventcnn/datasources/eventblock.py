@@ -76,3 +76,8 @@ class EventBlock:
         return tf.SparseTensorValue(indices,
                                     values,
                                     shape)
+
+    @property
+    def time_span(self):
+        return [self.events.iloc[0]["time"],
+                self.events.iloc[-1]["time"]]

@@ -75,6 +75,7 @@ class DavisDataset:
             stop_time = groundtruth.iloc[-1].time
             events = events[start_time <= events["time"]]
             events = events[events["time"] <= stop_time]
+            events = events.reset_index(drop=True)
             store.append(
                 "events",
                 events,
@@ -123,6 +124,14 @@ class DavisDataset:
     def event_block(self, start_index, num_events):
         stop_index = start_index + num_events
         events = self.select_events(start_index, stop_index)
+        return self._create_event_block(events)
+
+    def event_block_from_times(self, start_time, end_time):
+        events = self.store.select("events",
+                                   "time >= start_time & time < end_time")
+        return self._create_event_block(events)
+
+    def _create_event_block(self, events):
         start_time = events.iloc[0].time
         end_time = events.iloc[-1].time
         groundtruth_before = self.store.select(
