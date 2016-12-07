@@ -59,6 +59,24 @@ class EventBlock:
     def num_events(self):
         return len(self.events)
 
+    def event_indices(self, n_layers=None, scaling=1):
+        if n_layers is None:
+            n_layers = self.num_events
+        return np.hstack(((self.events[["x", "y"]] // scaling),
+                          np.floor(np.arange(0, n_layers, n_layers / self.num_events).reshape((-1,1))))).astype(np.uint16)
+
+    def events_rescaled(self, n_layers=None, scaling=1):
+        if n_layers is None:
+            n_layers = self.num_events
+        data = np.zeros((self.camera_config.cols // scaling,
+                         self.camera_config.rows // scaling,
+                         n_layers))
+        indices = self.event_indices(n_layers=n_layers, scaling=scaling)
+        values = self.events["polarity"].as_matrix() - 0.5
+        for (i, I) in enumerate(indices):
+            data[I[0], I[1], I[2]] += values[i]
+        return data
+
     def events_as_sparse_tensor(self):
         # Extract indices in x, y, z order
         indices = self.events[["x", "y"]].as_matrix()

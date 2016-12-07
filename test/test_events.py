@@ -48,3 +48,10 @@ class TestEventBlock(unittest.TestCase):
         # Only one non-zero value
         self.assertEqual(np.sum(one_hot != 0), 1)
 
+    def test_rescaling(self):
+        dataset = DavisDataset.named_dataset("shapes_translation")
+        eventblock = dataset.event_block(100, 1000)
+        self.assertEqual(np.sum(eventblock.events_rescaled()),
+                         np.sum(eventblock.events_rescaled(100, 10)))
+
+
