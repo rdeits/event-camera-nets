@@ -68,13 +68,16 @@ class EventBlock:
     def events_rescaled(self, n_layers=None, scaling=1):
         if n_layers is None:
             n_layers = self.num_events
+        # Construct the dense data matrix, with a trailing dimension
+        # of length 1 to keep tensorflow's conv3d happy
         data = np.zeros((self.camera_config.cols // scaling,
                          self.camera_config.rows // scaling,
-                         n_layers))
+                         n_layers,
+                         1))
         indices = self.event_indices(n_layers=n_layers, scaling=scaling)
         values = self.events["polarity"].as_matrix() - 0.5
         for (i, I) in enumerate(indices):
-            data[I[0], I[1], I[2]] += values[i]
+            data[I[0], I[1], I[2], 0] += values[i]
         return data
 
     def events_as_sparse_tensor(self):
