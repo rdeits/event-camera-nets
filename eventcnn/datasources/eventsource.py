@@ -1,4 +1,7 @@
 import numpy as np
+import tensorflow as tf
+import os
+import json
 
 
 class Split:
@@ -58,7 +61,51 @@ def split_data(testing_fraction,
                  splits["testing"])
 
 
-class EventSource:
+class EventRecordWriter:
+    def write_records(self, folder, n_layers=None, scaling=1):
+        os.makedirs(folder, exist_ok=True)
+        if n_layers is None:
+            n_layers = self.num_events
+
+        def make_example(block):
+            events = block.events_as_dense_two_channel(
+                n_layers=n_layers,
+                scaling=scaling)
+            label = block.delta_position
+            example = tf.train.Example(
+                features=tf.train.Features(
+                    feature={
+                        'label': tf.train.Feature(
+                            float_list=tf.train.FloatList(value=label)),
+                        'events': tf.train.Feature(
+                            int64_list=tf.train.Int64List(
+                                 value=map(int, events.flat)))
+                    }))
+            return example
+
+        sources = [("training", self.training(shuffle=False)),
+                   ("validation", self.validation()),
+                   ("testing", self.testing())]
+        for (name, source) in sources:
+            writer = tf.python_io.TFRecordWriter(
+                os.path.join(folder, "{:s}.tfrecords".format(name)))
+            num_blocks = 0
+            for block in source:
+                example = make_example(block)
+                writer.write(example.SerializeToString())
+                num_blocks += 1
+                print(name, num_blocks)
+                if num_blocks > 20:
+                    break
+        with open(os.path.join(folder, "metadata.json"), "w") as f:
+            json.dump({
+                "rows": self.rows // scaling,
+                "cols": self.cols // scaling,
+                "event_layers": n_layers,
+                "channels": 2}, f)
+
+
+class EventSource(EventRecordWriter):
     def __init__(self, dataset,
                  testing_fraction,
                  validation_fraction,
@@ -70,6 +117,14 @@ class EventSource:
         self.split = split_data(testing_fraction, validation_fraction,
                                 self.dataset.num_events,
                                 events_per_block=events_per_block)
+
+    @property
+    def rows(self):
+        return self.dataset.camera_config.rows
+
+    @property
+    def cols(self):
+        return self.dataset.camera_config.cols
 
     @property
     def num_training(self):
@@ -125,9 +180,17 @@ def take_randomly(iterables, lengths):
         yield next(iterators[selector])
 
 
-class EventSourceCombination:
+class EventSourceCombination(EventRecordWriter):
     def __init__(self, sources):
         self.sources = sources
+
+    @property
+    def cols(self):
+        return self.sources[0].cols
+
+    @property
+    def rows(self):
+        return self.sources[0].rows
 
     @property
     def events_per_block(self):
