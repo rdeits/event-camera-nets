@@ -79,7 +79,7 @@ class EventRecordWriter:
                             float_list=tf.train.FloatList(value=label)),
                         'events': tf.train.Feature(
                             int64_list=tf.train.Int64List(
-                                 value=map(int, events.flat)))
+                                 value=events.flatten().tolist()))
                     }))
             return example
 

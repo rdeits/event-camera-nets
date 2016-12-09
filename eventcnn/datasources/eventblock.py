@@ -88,9 +88,12 @@ class EventBlock:
                          n_layers,
                          2), dtype=np.byte)
         indices = self.event_indices(n_layers=n_layers, scaling=scaling)
-        values = self.events["polarity"].as_matrix()
-        for (i, I) in enumerate(indices):
-            data[I[0], I[1], I[2], int(values[i])] = 1
+        indices = np.hstack((indices, self.events["polarity"].values.reshape((-1,1))))
+        flat_indices = np.ravel_multi_index(indices.T, data.shape)
+        data.flat[flat_indices] = 1
+        # values = self.events["polarity"]
+        # for (i, I) in enumerate(indices):
+        #     data[I[0], I[1], I[2], int(values.iloc[i])] = 1
         return data
 
     def events_as_sparse_tensor(self):
