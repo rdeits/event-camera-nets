@@ -59,6 +59,51 @@ class EventBlock:
     def num_events(self):
         return len(self.events)
 
+    def event_indices(self, n_layers=None, scaling=1):
+        if n_layers is None:
+            n_layers = self.num_events
+        return np.hstack(((self.events[["x", "y"]] // scaling),
+                          np.floor(np.arange(0, n_layers, n_layers / self.num_events).reshape((-1,1))))).astype(np.uint16)
+
+    def events_rescaled(self, n_layers=None, scaling=1):
+        if n_layers is None:
+            n_layers = self.num_events
+        # Construct the dense data matrix, with a trailing dimension
+        # of length 1 to keep tensorflow's conv3d happy
+        data = np.zeros((self.camera_config.cols // scaling,
+                         self.camera_config.rows // scaling,
+                         n_layers,
+                         1))
+        indices = self.event_indices(n_layers=n_layers, scaling=scaling)
+        values = self.events["polarity"].as_matrix() - 0.5
+        for (i, I) in enumerate(indices):
+            data[I[0], I[1], I[2], 0] += values[i]
+        return data
+
+    def events_as_sparse_two_channel(self, n_layers=None, scaling=1):
+        if n_layers is None:
+            n_layers = self.num_events
+        indices = self.event_indices(n_layers=n_layers, scaling=scaling)
+        indices = np.hstack((indices, self.events["polarity"].values.reshape(
+            (-1, 1))))
+        return indices
+        # return np.vstack(set(map(tuple, indices)))
+
+    def events_as_dense_two_channel(self, n_layers=None, scaling=1):
+        if n_layers is None:
+            n_layers = self.num_events
+        data = np.zeros((self.camera_config.cols // scaling,
+                         self.camera_config.rows // scaling,
+                         n_layers,
+                         2), dtype=np.bool)
+        indices = self.events_as_sparse_two_channel(n_layers=n_layers,
+                                                    scaling=scaling)
+        # flat_indices = np.ravel_multi_index(indices.T, data.shape)
+        # data.flat[flat_indices] = 1
+        for I in indices:
+            data[I[0], I[1], I[2], I[3]] = 1
+        return data
+
     def events_as_sparse_tensor(self):
         # Extract indices in x, y, z order
         indices = self.events[["x", "y"]].as_matrix()

@@ -1,4 +1,8 @@
 import numpy as np
+import tensorflow as tf
+import os
+import json
+import h5py
 
 
 class Split:
@@ -58,7 +62,119 @@ def split_data(testing_fraction,
                  splits["testing"])
 
 
-class EventSource:
+class CachedDenseEventSource:
+    def __init__(self, folder):
+        self.files = {"training": h5py.File(os.path.join(folder,
+                                                         "training.h5")),
+                      "testing": h5py.File(os.path.join(folder,
+                                                        "testing.h5")),
+                      "validation": h5py.File(os.path.join(folder,
+                                                           "validation.h5"))}
+
+    @property
+    def rows(self):
+        return self.files["training"]["events"].shape[2]
+
+    @property
+    def cols(self):
+        return self.files["training"]["events"].shape[1]
+
+    @property
+    def event_slices(self):
+        return self.files["training"]["events"].shape[3]
+
+    @property
+    def num_training(self):
+        return self.files["training"]["events"].shape[0]
+
+    @property
+    def num_testing(self):
+        return self.files["testing"]["events"].shape[0]
+
+    @property
+    def num_validation(self):
+        return self.files["validation"]["events"].shape[0]
+
+    def training(self):
+        return self.files["training"]
+
+    def testing(self):
+        return self.files["testing"]
+
+    def validation(self):
+        return self.files["validation"]
+
+
+class EventSourceBase:
+
+    def cache_dense_events(self, folder, n_layers=4, scaling=1):
+        sources = [("training", self.training(shuffle=True)),
+                   ("validation", self.validation()),
+                   ("testing", self.testing())]
+        os.makedirs(folder, exist_ok=True)
+        for (name, source) in sources:
+            event_sets = []
+            label_sets = []
+            num_blocks = 0
+            for block in source:
+                num_blocks += 1
+                if num_blocks % 100 == 0:
+                    print(name, num_blocks)
+                event_sets.append(
+                    block.events_as_dense_two_channel(n_layers=n_layers,
+                                                      scaling=scaling))
+                label_sets.append(block.delta_position)
+            events = np.stack(event_sets)
+            labels = np.stack(label_sets)
+            with h5py.File(os.path.join(folder, name + ".h5"), "w") as file:
+                event_dset = file.create_dataset("events",
+                                                 data=events,
+                                                 compression="lzf",
+                                                 chunks=(1, *events.shape[1:]))
+                labels_dset = file.create_dataset("labels",
+                                                  data=labels)
+
+    def write_records(self, folder, n_layers=None, scaling=1):
+        os.makedirs(folder, exist_ok=True)
+        def make_example(block):
+            events = block.events_as_dense_two_channel(
+                n_layers=n_layers,
+                scaling=scaling)
+            label = block.delta_position
+            example = tf.train.Example(
+                features=tf.train.Features(
+                    feature={
+                        'label': tf.train.Feature(
+                            float_list=tf.train.FloatList(value=label)),
+                        'events': tf.train.Feature(
+                            int64_list=tf.train.Int64List(
+                                 value=events.flatten().tolist()))
+                    }))
+            return example
+
+        sources = [("training", self.training(shuffle=False)),
+                   ("validation", self.validation()),
+                   ("testing", self.testing())]
+        for (name, source) in sources:
+            writer = tf.python_io.TFRecordWriter(
+                os.path.join(folder, "{:s}.tfrecords".format(name)))
+            num_blocks = 0
+            for block in source:
+                example = make_example(block)
+                writer.write(example.SerializeToString())
+                num_blocks += 1
+                print(name, num_blocks)
+                if num_blocks > 20:
+                    break
+        with open(os.path.join(folder, "metadata.json"), "w") as f:
+            json.dump({
+                "rows": self.rows // scaling,
+                "cols": self.cols // scaling,
+                "event_layers": n_layers,
+                "channels": 2}, f)
+
+
+class EventSource(EventSourceBase):
     def __init__(self, dataset,
                  testing_fraction,
                  validation_fraction,
@@ -70,6 +186,14 @@ class EventSource:
         self.split = split_data(testing_fraction, validation_fraction,
                                 self.dataset.num_events,
                                 events_per_block=events_per_block)
+
+    @property
+    def rows(self):
+        return self.dataset.camera_config.rows
+
+    @property
+    def cols(self):
+        return self.dataset.camera_config.cols
 
     @property
     def num_training(self):
@@ -125,9 +249,17 @@ def take_randomly(iterables, lengths):
         yield next(iterators[selector])
 
 
-class EventSourceCombination:
+class EventSourceCombination(EventSourceBase):
     def __init__(self, sources):
         self.sources = sources
+
+    @property
+    def cols(self):
+        return self.sources[0].cols
+
+    @property
+    def rows(self):
+        return self.sources[0].rows
 
     @property
     def events_per_block(self):
