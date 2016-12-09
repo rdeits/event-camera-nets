@@ -134,11 +134,32 @@ class EventBlock:
 
         shape = [(np.int64)(self.camera_config.cols / scaling),
                  (np.int64)(self.camera_config.rows / scaling),
-                 n_layers-1]
+                 n_layers]
 
         return tf.SparseTensorValue(indices,
                                     values,
                                     shape)
+
+
+    def events_as_dense_nptensor_rescaled(self, n_layers, scaling):
+    # Extract indices in x, y, z order
+        indices = (self.events[["x", "y"]].as_matrix() / scaling).round().astype(np.uint16)
+        indices = np.hstack(
+            (indices,
+             np.arange(0, n_layers-1, (n_layers-1)/self.num_events).round().reshape((-1, 1))))
+
+        # convert polarity from {False, True} to {-0.5, 0.5}
+        values = self.events["polarity"].as_matrix() - 0.5
+
+        shape = [(np.int64)(self.camera_config.cols / scaling),
+                 (np.int64)(self.camera_config.rows / scaling),
+                 n_layers]
+
+        tensor = np.zeros(shape)
+
+        tensor.put(indices.astype(np.uint16), values)
+
+        return tensor
 
 
     @property
